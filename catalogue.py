@@ -99,9 +99,12 @@ if MssqlActive:
 
 #assert hasattr(tf, "function") # Be sure to use tensorflow 2.0
 
-column_names = ['CRMID', 'RangAll', 'cat_recu', 'commande']
-column_names_output = ['CRMID', 'RangAll', 'cat_recu', 'commande', 'cat_recu_predict', 'commande_predict']
-dtypes = {'CRMID': float, 'RangAll': float, 'cat_recu': float, 'commande': float}
+column_names = ['CRMID', 'RangAll', 'RangCat', 'cat_recu', 'commande']
+column_names_output = ['CRMID', 'RangAll', 'RangCat', 'cat_recu', 'commande', 'commande_predict']
+# pour les fichiers csv
+dtypes = {'CRMID': float, 'RangAll': float, 'RangCat': float, 'cat_recu': float, 'commande': float}
+#pour les donnees sql
+dtypes2 = {'CRMID': np.float64, 'RangAll': np.float64, 'RangCat': np.float64, 'cat_recu': np.float64, 'commande': np.float64}
 train_input = []
 test_input = []
 
@@ -136,11 +139,12 @@ if MssqlActive:
     while reader.Read():
         col_crmid = reader["CRMID"]
         col_RangAll = reader["RangAll"]
+        col_RangCat = reader["RangCat"]
         col_cat_recu = reader["cat_recu"]
         col_commande = reader["commande"]
-        train_input.append((col_crmid, col_RangAll, col_cat_recu, col_commande))
+        train_input.append((col_crmid, col_RangAll, col_RangCat, col_cat_recu, col_commande))
     reader.Close()
-    df_train = pd.DataFrame(train_input, columns=column_names)
+    df_train = pd.DataFrame(train_input, columns=column_names).astype(dtypes2)
 
     queryTest = tabInputTest
     command = SqlCommand(queryTest, connConfig)
@@ -148,11 +152,12 @@ if MssqlActive:
     while reader.Read():
         col_crmid = reader["CRMID"]
         col_RangAll = reader["RangAll"]
+        col_RangCat = reader["RangCat"]
         col_cat_recu = reader["cat_recu"]
         col_commande = reader["commande"]
-        test_input.append((col_crmid, col_RangAll, col_cat_recu, col_commande))
+        test_input.append((col_crmid, col_RangAll, col_RangCat, col_cat_recu, col_commande))
     reader.Close()
-    df_test = pd.DataFrame(test_input, columns=column_names)
+    df_test = pd.DataFrame(test_input, columns=column_names).astype(dtypes2)
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin lecture des données')
 
@@ -161,20 +166,26 @@ print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin lectur
 #print(len(df_cat_train))
 #print(df_cat_train[:10])
 
+# j'enleve le crmid mon dateset d'entrainement d'input
 dataset_train_input = np.array(df_train)
+dataset_train_input = dataset_train_input[:, 1:]
 nb_lignes_train = len(dataset_train_input)
-dataset_train_output = dataset_train_input[:, 2:]
+# je ne garde que le commande de mon dataset d'entrainement d'input
+dataset_train_output = dataset_train_input[:, 3:]
 
+# j'enleve le crmid mon dateset de test d'input
 dataset_test_input = np.array(df_test)
+dataset_test_input = dataset_test_input[:, 1:]
 nb_lignes_test = len(dataset_test_input)
-dataset_test_output = dataset_test_input[:, 2:]
+# je ne garde que le commande de mon dataset de test d'input
+dataset_test_output = dataset_test_input[:, 3:]
 
 #dataset_output = dataset_input[:-1, 2:]
 #dataset_output = dataset_input[1:, 2:]
 #derniere_ligne = np.array([[0, 0]])
 #dataset_output = np.append(dataset_output, derniere_ligne, axis = 0)
 #dataset_output = np.append(derniere_ligne, dataset_output, axis = 0)
-dataset_test = dataset_train_input[:17, :]
+#dataset_test = dataset_train_input[:17, :]
 
 print(len(dataset_train_input))
 print(dataset_train_input.shape)
@@ -184,25 +195,40 @@ print(len(dataset_train_output))
 print(dataset_train_output.shape)
 #print(dataset_train_output[:20])
 
-mean1 = dataset_train_input[:, :1].mean()
-std1  = dataset_train_input[:, :1].std()
-dataset_train_input[:, :1] = (dataset_train_input[:, :1] - mean1) / std1
-mean2 = dataset_train_input[:, 1:2].mean()
-std2  = dataset_train_input[:, 1:2].std()
-dataset_train_input[:, 1:2] = (dataset_train_input[:, 1:2] - mean2) / std2
+# normalisation su crmid du dataset d'entrainement
+#mean1 = dataset_train_input[:, :1].mean()
+#std1  = dataset_train_input[:, :1].std()
+#dataset_train_input[:, :1] = (dataset_train_input[:, :1] - mean1) / std1
 
-mean11 = dataset_test_input[:, :1].mean()
-std12  = dataset_test_input[:, :1].std()
-dataset_test_input[:, :1] = (dataset_test_input[:, :1] - mean1) / std1
-mean21 = dataset_test_input[:, 1:2].mean()
-std22  = dataset_test_input[:, 1:2].std()
-dataset_test_input[:, 1:2] = (dataset_test_input[:, 1:2] - mean2) / std2
+# normalisation su crmid du dataset de test
+#mean11 = dataset_test_input[:, :1].mean()
+#std12  = dataset_test_input[:, :1].std()
+#dataset_test_input[:, :1] = (dataset_test_input[:, :1] - mean1) / std1
 
+# normalisation su RangAll du dataset d'entrainement
+mean2 = dataset_train_input[:, :1].mean()
+std2  = dataset_train_input[:, :1].std()
+dataset_train_input[:, :1] = (dataset_train_input[:, :1] - mean2) / std2
 
-#print('mean1:', mean1)
-#print('std1:', std1)
-#print('mean2:', mean2)
-#print('std2:', std2)
+# normalisation su RangAll du dataset de test
+mean21 = dataset_test_input[:, :1].mean()
+std22  = dataset_test_input[:, :1].std()
+dataset_test_input[:, :1] = (dataset_test_input[:, :1] - mean2) / std2
+
+# normalisation su RangCat du dataset d'entrainement
+mean3 = dataset_train_input[:, 1:2].mean()
+std3  = dataset_train_input[:, 1:2].std()
+dataset_train_input[:, 1:2] = (dataset_train_input[:, 1:2] - mean3) / std3
+
+# normalisation su RangCat du dataset de test
+mean31 = dataset_test_input[:, 1:2].mean()
+std32  = dataset_test_input[:, 1:2].std()
+dataset_test_input[:, 1:2] = (dataset_test_input[:, 1:2] - mean3) / std3
+
+print('mean2:', mean2)
+print('std2:', std2)
+print('mean2:', mean3)
+print('std2:', std3)
 
 #mean3 = dataset_input[:, 2:4].mean()
 #std3  = dataset_input[:, 2:4].std()
@@ -216,15 +242,14 @@ dataset_test_input[:, 1:2] = (dataset_test_input[:, 1:2] - mean2) / std2
 #std5  = dataset_test.std()
 #dataset_test = (dataset_test - mean5) / std5
 
-"""
-print(len(dataset_input))
-print(dataset_input.shape)
-print(dataset_input[:20])
+#print(len(dataset_input))
+#print(dataset_input.shape)
+#print(dataset_input[:20])
 
-print(len(dataset_output))
-print(dataset_output.shape)
-print(dataset_output[:20])
-"""
+#print(len(dataset_output))
+#print(dataset_output.shape)
+#print(dataset_output[:20])
+
 print(vbatch_size)
 print(vstride)
 print(vlength)
@@ -245,16 +270,16 @@ print('batch y shape : ',y.shape)
 
 model = keras.models.Sequential()
 model.add( keras.layers.InputLayer(input_shape=(vlength, 4)))
-model.add( keras.layers.LSTM(100, return_sequences=False, activation='relu'))
+model.add( keras.layers.LSTM(200, return_sequences=False, activation='relu'))
 #model.add( keras.layers.Dense(200))
-model.add( keras.layers.Dense(2))
+model.add( keras.layers.Dense(1))
 model.summary()
 
 model.compile(optimizer='rmsprop', 
               loss='mse', 
               metrics = ['mae'])
 
-history=model.fit(train_generator, epochs = 10, validation_data = test_generator)
+history=model.fit(train_generator, epochs = 20, validation_data = test_generator)
                   #verbose = 1,
                   #validation_data = test_generator,
                   #callbacks = [bestmodel_callback])
@@ -276,12 +301,15 @@ for i in range(len(test_generator)):
     for j in range(len(x)):
         #print(x[j])
         #print(prediction[j])
-        cli_rang = np.array([output_temp[i*vbatch_size * vstride + j*vstride][0], 100])
+        cli_rang = np.array([output_temp[i*vbatch_size * vstride + j*vstride][0], 100, 100, 1])
         final_predict = np.append(cli_rang, prediction[j])
         #print(final_predict)
         a = i*vbatch_size * vstride + j*vstride
         b = i*vbatch_size * vstride + j*vstride + vlength
         #print ('a, b:',a, b)
+        #print(output_temp[a:b])
+        #print(final_predict)
+        #print(cli_rang)       
         if i == 0 and j == 0:
             output = (np.vstack((output_temp[a:b],final_predict)))
         else:
@@ -289,15 +317,15 @@ for i in range(len(test_generator)):
 
 print('---------------------- sortie ----------------------')
 
-"""
-print(len(output[:, -2:]))
-print(output[:, -2:].shape)
-print(len(output_temp))
-print(output_temp.shape)
-print(output)
-#print(output[:, -2:])
-"""
-result = np.hstack((output_temp, output[:, -2:]))
+#print(len(output[:, -2:]))
+#print(output[:, -2:].shape)
+#print(len(output_temp))
+#print(output_temp.shape)
+#print(output.shape)
+#print(output)
+#print(output[:, -1:])
+
+result = np.hstack((output_temp, output[:, -1:]))
 
 print('---------------------- result ----------------------')
 print(len(result))
@@ -311,34 +339,7 @@ print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut ecri
 if csvActive:
     df.to_csv(out, index=False, sep=';', header=True)
 if MssqlActive:
-    """
-    # Convert DataFrame to a list of tuples
-    data_to_insert = [tuple(row) for row in df.itertuples(index=False)]
-
-    # Requête SQL pour l'insertion des données
-    query = tabOutputTest
-
-    # Début de la transaction
-    #transaction = connConfig.BeginTransaction()
-    # Exécution de la requête pour chaque ligne de données
-    try:
-        command = connConfig.CreateCommand()
-        #command.Transaction = transaction
-        command.CommandText = query  # Set the command text before adding parameters
-        for row in data_to_insert:
-            # Clear existing parameters to avoid conflicts
-            command.Parameters.Clear()
-            command.Parameters.AddWithValue("@col1", row[0])
-            command.Parameters.AddWithValue("@col2", row[1])
-            command.Parameters.AddWithValue("@col3", SqlDbType.Int).Value = row[2]
-            command.Parameters.AddWithValue("@col4", SqlDbType.Int).Value = row[3]
-            command.Parameters.AddWithValue("@col5", SqlDbType.Float).Value = row[4]
-            command.Parameters.AddWithValue("@col6", SqlDbType.Float).Value = row[5]
-            command.ExecuteNonQuery()
-    finally:
-        command.Dispose()
-    """
-    table_name = "cat_out10"
+    table_name = "cat_out11"
 
     # Convert DataFrame to DataTable using pydatatable
     #dt_table = dt.Frame(df)
@@ -358,14 +359,13 @@ if MssqlActive:
     #df.to_sql(tabOutputTest, connConfig, if_exists="replace", index=False)
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin ecriture des données')
-"""
 
-data_apredire = np.expand_dims(dataset_test, axis=0)
-print(data_apredire.shape)
-print(data_apredire)
-prediction = model.predict(data_apredire)
-print(prediction)
-"""
+#data_apredire = np.expand_dims(dataset_test, axis=0)
+#print(data_apredire.shape)
+#print(data_apredire)
+#prediction = model.predict(data_apredire)
+#print(prediction)
+
 #dataset_test[:, 2:4] = (dataset_test[:, 2:4] * std3) / mean3
 #print(dataset_test)
 
@@ -373,3 +373,5 @@ print(prediction)
 #std4  = prediction.std()
 #prediction = (prediction * std4) + mean4
 #print(prediction)
+
+#connConfig.Close()
