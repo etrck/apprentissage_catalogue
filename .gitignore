@@ -1,0 +1,10 @@
+config*
+envCat
+in*
+out*
+log*
+drop_table_out.sql
+RNN - Text Generator.ipynb
+SYNOP1-Preparation-of-data.ipynb
+copySegFid.py
+__pycache__
