@@ -17,6 +17,8 @@ clr.AddReference('System.Data')
 from System.Data import SqlDbType, DataTable, DataColumn, DataRow
 from System.Data.SqlClient import SqlConnection, SqlCommand, SqlParameter, SqlBulkCopy
 
+import pyodbc
+
 def convert_to_datatable(df):
     dt = DataTable()
 
@@ -63,11 +65,19 @@ with open(file_path) as json_file:
     config = json.load(json_file)
 
 ConnectMssql = config['ConnectMssql']
-MssqlActive = ConnectMssql['active']
-MssqlConnect = ConnectMssql['connect']
-tabInputTrain = ConnectMssql['tabInputTrain']
-tabInputTest = ConnectMssql['tabInputTest']
-tabOutputTest = ConnectMssql['tabOutputTest']
+MssqlActive1 = ConnectMssql['active']
+MssqlActive12 = ConnectMssql['active2']
+MssqlConnect1 = ConnectMssql['connect']
+tabInputTrain1 = ConnectMssql['tabInputTrain']
+tabInputTest1 = ConnectMssql['tabInputTest']
+tabOutputTest1 = ConnectMssql['tabOutputTest']
+
+ConnectPyodbc = config['ConnectPyodbc']
+MssqlActive2 = ConnectPyodbc['active']
+MssqlConnect2 = ConnectPyodbc['connect']
+tabInputTrain2 = ConnectPyodbc['tabInputTrain']
+tabInputTest2 = ConnectPyodbc['tabInputTest']
+tabOutputTest2 = ConnectPyodbc['tabOutputTest']
 
 Parametre = config['Parametre']
 vbatch_size = Parametre['batch_size']
@@ -94,9 +104,12 @@ if logActive:
 print(' ')
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'début traitement')
 
-if MssqlActive:
-    connConfig = SqlConnection(MssqlConnect)
+if MssqlActive1:
+    connConfig = SqlConnection(MssqlConnect1)
     connConfig.Open()
+
+if MssqlActive2:
+    connPyodbc = pyodbc.connect(MssqlConnect2)
 
 #assert hasattr(tf, "function") # Be sure to use tensorflow 2.0
 
@@ -143,8 +156,8 @@ if csvActive:
     nb_lignes_test = len(test_input)
     df_test = pd.concat(test_input, axis=0, ignore_index=True)
 
-if MssqlActive:
-    queryTrain = tabInputTrain
+if MssqlActive12:
+    queryTrain = tabInputTrain1
     command = SqlCommand(queryTrain, connConfig)
     reader = command.ExecuteReader()
     i = 0
@@ -213,7 +226,7 @@ if MssqlActive:
     reader.Close()
     df_train = pd.DataFrame(train_input, columns=column_names).astype(dtypes2)
 
-    queryTest = tabInputTest
+    queryTest = tabInputTest1
     command = SqlCommand(queryTest, connConfig)
     reader = command.ExecuteReader()
     i = 0
@@ -282,13 +295,34 @@ if MssqlActive:
     reader.Close()
     df_test = pd.DataFrame(test_input, columns=column_names).astype(dtypes2)
 
+if MssqlActive2:
+    cursor = connPyodbc.cursor()
+    queryTrain = tabInputTrain2    
+    cursor.execute(queryTrain)
+    result_rows = cursor.fetchall()
+    column_names2 = [desc[0] for desc in cursor.description]
+    train_input = np.array(result_rows)
+    df_train = pd.DataFrame(train_input, columns=column_names2).astype(dtypes2)
+    cursor.close()
+
+    cursor = connPyodbc.cursor()
+    queryTest = tabInputTest2    
+    cursor.execute(queryTest)
+    result_rows = cursor.fetchall()
+    column_names2 = [desc[0] for desc in cursor.description]
+    test_input = np.array(result_rows)
+    df_test = pd.DataFrame(test_input, columns=column_names2).astype(dtypes2)
+    cursor.close()
+
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin lecture des données')
 
 #df_cat_train = pd.read_csv("C:/Users/TRINCKLIN/Documents/AFM/Python/github/apprentissage_catalogue/in/cat_train10.csv", header=None, names=column_names, sep=';', skiprows=1, dtype=dtypes)
 #df_cat_test = pd.read_csv("C:/Users/TRINCKLIN/Documents/AFM/Python/github/apprentissage_catalogue/in/cat_test10.csv", header=None, names=column_names, sep=';', skiprows=1, dtype=dtypes)
-#print(len(df_train))
-#print(df_train[:10])
+print(len(df_train))
+print(df_train[:10])
 
+print(len(df_test))
+print(df_test[:10])
 # j'enleve le crmid + rangAll mon dataset d'entrainement d'input
 dataset_train_input = np.array(df_train)
 dataset_train_input = dataset_train_input[:, 2:]
@@ -318,7 +352,7 @@ dataset_test_output = dataset_test_input[:, -1:]
 #print(len(dataset_train_output))
 #print(dataset_train_output.shape)
 #print(dataset_train_output[:20])
-#print('test_input order_amount', dataset_test_input[:, 41:42])
+#print('test_input order_amount', dataset_test_input[:20, 41:42])
 
 # normalisation du mntOrder du dataset d'entrainement
 mean11 = dataset_train_input[:, 41:42].mean()
@@ -342,13 +376,13 @@ print(vlength)
 print(nb_lignes_train)
 print(nb_lignes_test)
 
-print(len(dataset_train_input))
-print(dataset_train_input.shape)
-print(dataset_train_input[:20, :])
+#print(len(dataset_train_input))
+#print(dataset_train_input.shape)
+#print(dataset_train_input[:20, :])
 
-print(len(dataset_train_output))
-print(dataset_train_output.shape)
-print(dataset_train_output[:20])
+#print(len(dataset_train_output))
+#print(dataset_train_output.shape)
+#print(dataset_train_output[:20])
 
 # pad_sequences
 # .....
@@ -372,9 +406,9 @@ print('batch y shape : ',y.shape)
 
 model = keras.models.Sequential()
 model.add( keras.layers.InputLayer(input_shape=(vlength, vparameter)))
-model.add( keras.layers.LSTM(100, return_sequences=False, activation='relu'))
+model.add( keras.layers.LSTM(50, return_sequences=False, activation='relu'))
 #model.add( keras.layers.Dense(200))
-model.add( keras.layers.Dense(1))
+model.add( keras.layers.Dense(1, activation='relu'))
 model.summary()
 
 model.compile(optimizer='rmsprop', 
@@ -383,7 +417,7 @@ model.compile(optimizer='rmsprop',
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut entrainement du modele')
 
-history=model.fit(train_generator, epochs = 10, validation_data = test_generator)
+history=model.fit(train_generator, epochs = 5, validation_data = test_generator)
                   #verbose = 1,
                   #validation_data = test_generator,
                   #callbacks = [bestmodel_callback])
@@ -404,11 +438,11 @@ output_temp2 = output_temp2[:, -1:]
 print('------------------ output_temp1 --------------------')
 print(len(output_temp1))
 print(output_temp1.shape)
-print(output_temp1[:20, :])
+#print(output_temp1[:20, :])
 print('------------------ output_temp2 --------------------')
 print(len(output_temp2))
 print(output_temp2.shape)
-print(output_temp2[:20, :])
+#print(output_temp2[:20, :])
 
 # fusion des deux tableau --> crmid, rangall, cat_commande
 output_temp = np.concatenate((output_temp1, output_temp2), axis=1)
@@ -416,7 +450,7 @@ output_temp = np.concatenate((output_temp1, output_temp2), axis=1)
 print('------------------ output_temp --------------------')
 print(len(output_temp))
 print(output_temp.shape)
-print(output_temp[:20, :])
+#print(output_temp[:20, :])
 
 output = []
 #output[:, :1] = (output[:, :1] * std1) + mean1
@@ -476,14 +510,14 @@ print(result_predict.shape)
 #print(result_predict)
 
 df = pd.DataFrame(result_predict, columns=column_names_output)
-#print(df)
+print('output:', df)
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut ecriture des données')
 if csvActive:
     df.to_csv(out, index=False, sep=';', header=True)
 
-if MssqlActive:
-    table_name = tabOutputTest
+if MssqlActive1:
+    table_name = tabOutputTest1
 
     # Convert DataFrame to DataTable using pydatatable
     #dt_table = dt.Frame(df)
@@ -501,6 +535,9 @@ if MssqlActive:
         # Fermeture de la connexion
     connConfig.Close()
     #df.to_sql(tabOutputTest, connConfig, if_exists="replace", index=False)
+
+if MssqlActive2:
+    connPyodbc.close()
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin ecriture des données')
 
