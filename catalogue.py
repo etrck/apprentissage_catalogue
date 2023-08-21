@@ -2,6 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
+#from sklearn.metrics import precision_score, recall_score
 
 import numpy as np
 import pandas as pd
@@ -84,6 +85,7 @@ vbatch_size = Parametre['batch_size']
 vstride = Parametre['stride']
 vlength = Parametre['length']
 vparameter = Parametre['parameter']
+ventrainement = Parametre['entrainement']
 
 FichierCsv = config['FichierCsv']
 csvActive = FichierCsv['active']
@@ -296,14 +298,17 @@ if MssqlActive12:
     df_test = pd.DataFrame(test_input, columns=column_names).astype(dtypes2)
 
 if MssqlActive2:
-    cursor = connPyodbc.cursor()
-    queryTrain = tabInputTrain2    
-    cursor.execute(queryTrain)
-    result_rows = cursor.fetchall()
-    column_names2 = [desc[0] for desc in cursor.description]
-    train_input = np.array(result_rows)
-    df_train = pd.DataFrame(train_input, columns=column_names2).astype(dtypes2)
-    cursor.close()
+    if ventrainement:
+        cursor = connPyodbc.cursor()
+        queryTrain = tabInputTrain2    
+        cursor.execute(queryTrain)
+        result_rows = cursor.fetchall()
+        column_names2 = [desc[0] for desc in cursor.description]
+        train_input = np.array(result_rows)
+        df_train = pd.DataFrame(train_input, columns=column_names2).astype(dtypes2)
+        cursor.close()
+        
+        del train_input
 
     cursor = connPyodbc.cursor()
     queryTest = tabInputTest2    
@@ -314,21 +319,27 @@ if MssqlActive2:
     df_test = pd.DataFrame(test_input, columns=column_names2).astype(dtypes2)
     cursor.close()
 
+    del result_rows
+    del test_input
+
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin lecture des données')
 
 #df_cat_train = pd.read_csv("C:/Users/TRINCKLIN/Documents/AFM/Python/github/apprentissage_catalogue/in/cat_train10.csv", header=None, names=column_names, sep=';', skiprows=1, dtype=dtypes)
 #df_cat_test = pd.read_csv("C:/Users/TRINCKLIN/Documents/AFM/Python/github/apprentissage_catalogue/in/cat_test10.csv", header=None, names=column_names, sep=';', skiprows=1, dtype=dtypes)
-print(len(df_train))
-print(df_train[:10])
+#print(len(df_train))
+#print(df_train[:10])
 
 print(len(df_test))
 print(df_test[:10])
 # j'enleve le crmid + rangAll mon dataset d'entrainement d'input
-dataset_train_input = np.array(df_train)
-dataset_train_input = dataset_train_input[:, 2:]
-nb_lignes_train = len(dataset_train_input)
-# je ne garde que le commande de mon dataset d'entrainement d'input
-dataset_train_output = dataset_train_input[:, -1:]
+if ventrainement:
+    dataset_train_input = np.array(df_train)
+    # suppression du DF train
+    del df_train
+    dataset_train_input = dataset_train_input[:, 2:]
+    nb_lignes_train = len(dataset_train_input)
+    # je ne garde que le commande de mon dataset d'entrainement d'input
+    dataset_train_output = dataset_train_input[:, -1:]
 
 # j'enleve le crmid + rang All mon dataset de test d'input
 dataset_test_input = np.array(df_test)
@@ -354,27 +365,28 @@ dataset_test_output = dataset_test_input[:, -1:]
 #print(dataset_train_output[:20])
 #print('test_input order_amount', dataset_test_input[:20, 41:42])
 
-# normalisation du mntOrder du dataset d'entrainement
-mean11 = dataset_train_input[:, 41:42].mean()
-std11 = dataset_train_input[:, 41:42].std()
-dataset_train_input[:, 41:42] = (dataset_train_input[:, 41:42] - mean11) / std11
+if ventrainement:
+    # normalisation du mntOrder du dataset d'entrainement
+    mean11 = dataset_train_input[:, 41:42].mean()
+    std11 = dataset_train_input[:, 41:42].std()
+    dataset_train_input[:, 41:42] = (dataset_train_input[:, 41:42] - mean11) / std11
 
-# normalisation su mntOrder du dataset de test
-mean12 = dataset_test_input[:, 41:42].mean()
-std12  = dataset_test_input[:, 41:42].std()
-dataset_test_input[:, 41:42] = (dataset_test_input[:, 41:42] - mean11) / std11
+    # normalisation su mntOrder du dataset de test
+    mean12 = dataset_test_input[:, 41:42].mean()
+    std12  = dataset_test_input[:, 41:42].std()
+    dataset_test_input[:, 41:42] = (dataset_test_input[:, 41:42] - mean11) / std11
 
-print('mean2:', mean11)
-print('std2:', std11)
-print('mean2:', mean12)
-print('std2:', std12)
+#print('mean2:', mean11)
+#print('std2:', std11)
+#print('mean2:', mean12)
+#print('std2:', std12)
 
-print(vbatch_size)
-print(vstride)
-print(vlength)
+#print(vbatch_size)
+#print(vstride)
+#print(vlength)
 
-print(nb_lignes_train)
-print(nb_lignes_test)
+#print(nb_lignes_train)
+#print(nb_lignes_test)
 
 #print(len(dataset_train_input))
 #print(dataset_train_input.shape)
@@ -389,13 +401,22 @@ print(nb_lignes_test)
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut generation time series')
 
-train_generator = TimeseriesGenerator(dataset_train_input, dataset_train_output, length=vlength, batch_size=vbatch_size, stride=vstride)
+if ventrainement:
+    train_generator = TimeseriesGenerator(dataset_train_input, dataset_train_output, length=vlength, batch_size=vbatch_size, stride=vstride)
+    # suppression des dataset train input/output
+    del dataset_train_input
+    del dataset_train_output
 test_generator = TimeseriesGenerator(dataset_test_input, dataset_test_output, length=vlength, batch_size=vbatch_size, stride=vstride)
 
-x,y=train_generator[0]
-print(f'Number of batch trains available : ', len(train_generator))
-print('batch x shape : ',x.shape)
-print('batch y shape : ',y.shape)
+# suppression des dataset test input/output
+del dataset_test_input
+del dataset_test_output
+
+if ventrainement:
+    x,y=train_generator[0]
+    print(f'Number of batch trains available : ', len(train_generator))
+    print('batch x shape : ',x.shape)
+    print('batch y shape : ',y.shape)
 
 x,y=test_generator[0]
 print(f'Number of batch trains available : ', len(test_generator))
@@ -404,36 +425,50 @@ print('batch y shape : ',y.shape)
 #print('batch x shape : ',x)
 #print('batch y shape : ',y)
 
-model = keras.models.Sequential()
-model.add( keras.layers.InputLayer(input_shape=(vlength, vparameter)))
-model.add( keras.layers.LSTM(50, return_sequences=False, activation='relu'))
-#model.add( keras.layers.Dense(200))
-model.add( keras.layers.Dense(1, activation='relu'))
-model.summary()
+if ventrainement:
+    model = keras.models.Sequential()
+    model.add( keras.layers.InputLayer(input_shape=(vlength, vparameter)))
+    model.add( keras.layers.LSTM(50, return_sequences=False, activation='relu'))
+    #model.add( keras.layers.Dense(200))
+    #model.add( keras.layers.Dense(1, activation='sigmoid'))
+    model.add( keras.layers.Dense(1))
+    model.summary()
 
-model.compile(optimizer='rmsprop', 
-              loss='mse', 
-              metrics = ['mae'])
+    model.compile(optimizer='rmsprop', loss='mse', metrics = ['mae'])
+    #model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut entrainement du modele')
+    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut entrainement du modele')
 
-history=model.fit(train_generator, epochs = 5, validation_data = test_generator)
+    #class_weight = {0: 0.95, 1: 0.05}
+    #history=model.fit(train_generator, epochs = 5, validation_data = test_generator, class_weight=class_weight)
+    history=model.fit(train_generator, epochs = 5, validation_data = test_generator)
                   #verbose = 1,
                   #validation_data = test_generator,
                   #callbacks = [bestmodel_callback])
-#
+    
+    del train_generator
+
+    # Sauvegarder le modèle
+    model.save('model_catalogue.h5')
+
+if not ventrainement:
+    # Charger le modèle
+    model = keras.models.load_model('model_catalogue.h5')
+
 # dénormalisation du dataset d'input
 #
 #
 #
 #
 # on récupère le crmid + rangall
-output_temp1 = np.array(df_test)
-output_temp1 = output_temp1[:, :2]
+output_temp1 = np.array(df_test)[:, :2]
+#output_temp1 = output_temp1[:, :2]
 
 # on récupère le commande
-output_temp2 = np.array(df_test)
-output_temp2 = output_temp2[:, -1:]
+output_temp2 = np.array(df_test)[:, -1:]
+#output_temp2 = output_temp2[:, -1:]
+
+del df_test
 
 print('------------------ output_temp1 --------------------')
 print(len(output_temp1))
@@ -446,6 +481,8 @@ print(output_temp2.shape)
 
 # fusion des deux tableau --> crmid, rangall, cat_commande
 output_temp = np.concatenate((output_temp1, output_temp2), axis=1)
+del output_temp1
+del output_temp2
 
 print('------------------ output_temp --------------------')
 print(len(output_temp))
@@ -460,7 +497,7 @@ print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut pred
 
 print(len(test_generator))
 for i in range(len(test_generator)):
-    #print('i:', i)
+    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'prediction n°:', i)
     x,y=test_generator[i]
     prediction = model.predict(x)
     #print(prediction.shape)
@@ -471,19 +508,25 @@ for i in range(len(test_generator)):
         #print(x[j])
         #print(prediction[j])
         # on récupère le crm_id de la prédiction (cli_rang)
-        cli_rang = np.array([output_temp[i*vbatch_size * vstride + j*vstride][0],vstride])
+        #cli_rang = np.array([output_temp[i*vbatch_size * vstride + j*vstride][0],vstride])
+        #print('is_order', i*vbatch_size * vstride + j*vstride + vstride - 1)
+        cli_rang = np.array([output_temp[i*vbatch_size * vstride + j*vstride][0],vstride,output_temp[i*vbatch_size * vstride + j*vstride + vstride - 1][2]])
         #print('cli_rang:', cli_rang)
         final_predict = np.append(cli_rang, prediction[j])
         #print('final_predict:', final_predict)
-        a = i*vbatch_size * vstride + j*vstride
-        b = i*vbatch_size * vstride + j*vstride + vlength
+        if i == 0 and j == 0:
+            output = final_predict
+        else:
+            output = (np.vstack((output,final_predict)))
+        #a = i*vbatch_size * vstride + j*vstride
+        #b = i*vbatch_size * vstride + j*vstride + vlength
         #print ('a, b:',a, b)
         #print('output_temp[a:b]', output_temp[a:b])
         # on concatene pour chaque client (sequence de client) verticalement la sequence de test (vlenght) + la prediction (vlenght + 1)
-        if i == 0 and j == 0:
-            output = (np.vstack((output_temp[a:b],final_predict)))
-        else:
-            output = np.vstack((output,(np.vstack((output_temp[a:b],final_predict)))))
+        #if i == 0 and j == 0:
+        #    output = (np.vstack((output_temp[a:b],final_predict)))
+        #else:
+        #    output = np.vstack((output,(np.vstack((output_temp[a:b],final_predict)))))
 
 print('---------------------- output ----------------------')
 
@@ -492,24 +535,26 @@ print('---------------------- output ----------------------')
 #print(len(output_temp))
 #print(output_temp.shape)
 print(output.shape)
-#print(output)
+print(output)
 #print(output[:, -1:])
 
 # resultat final : on garde le reel (crmid, rangall, commande) et on ajoute pour le dernier rang la prediction et pour le reste le commande
-result = np.hstack((output_temp, output[:, -1:]))
-result_predict = result[result[:, 1] == vstride]
+#result = np.hstack((output_temp, output[:, -1:]))
+#result_predict = result[result[:, 1] == vstride]
 
+"""
 print('---------------------- result ----------------------')
 print(len(result))
 print(result.shape)
-#print(result)
+print(result)
 
 print('---------------------- result predict----------------------')
 print(len(result_predict))
 print(result_predict.shape)
-#print(result_predict)
+print(result_predict)
+"""
 
-df = pd.DataFrame(result_predict, columns=column_names_output)
+df = pd.DataFrame(output, columns=column_names_output)
 print('output:', df)
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut ecriture des données')
