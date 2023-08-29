@@ -1,11 +1,9 @@
-import numpy as np
+model = keras.models.Sequential()
+model.add( keras.layers.InputLayer(input_shape=(41, 47)))
+model.add( keras.layers.LSTM(50, return_sequences=False, activation='relu'))
+model.add( keras.layers.Dense(1))
+model.summary()
 
-# Exemple de tableau numpy à deux entrées
-data = np.array([[1, 2, 3],
-                 [4, 5, 6],
-                 [7, 8, 9]])
+model.compile(optimizer='rmsprop', loss='mse', metrics = ['mae'])
 
-# Suppression de la première colonne
-data_sans_premiere_colonne = data[:, 2:]
-print(data_sans_premiere_colonne.shape)
-print(data_sans_premiere_colonne)
+history=model.fit(train_generator, epochs = 5, validation_data = test_generator)

@@ -69,22 +69,26 @@ ConnectMssql = config['ConnectMssql']
 MssqlActive1 = ConnectMssql['active']
 MssqlActive12 = ConnectMssql['active2']
 MssqlConnect1 = ConnectMssql['connect']
-tabInputTrain1 = ConnectMssql['tabInputTrain']
-tabInputTest1 = ConnectMssql['tabInputTest']
+#tabInputTrain1 = ConnectMssql['tabInputTrain']
+#tabInputVal1 = ConnectMssql['tabInputVal']
+#tabInputTest1 = ConnectMssql['tabInputTest']
 tabOutputTest1 = ConnectMssql['tabOutputTest']
 
 ConnectPyodbc = config['ConnectPyodbc']
 MssqlActive2 = ConnectPyodbc['active']
 MssqlConnect2 = ConnectPyodbc['connect']
 tabInputTrain2 = ConnectPyodbc['tabInputTrain']
+tabInputVal2 = ConnectPyodbc['tabInputVal']
 tabInputTest2 = ConnectPyodbc['tabInputTest']
-tabOutputTest2 = ConnectPyodbc['tabOutputTest']
+#tabOutputTest2 = ConnectPyodbc['tabOutputTest']
 
 Parametre = config['Parametre']
 vbatch_size = Parametre['batch_size']
 vstride = Parametre['stride']
 vlength = Parametre['length']
 vparameter = Parametre['parameter']
+vepoch = Parametre['epoch']
+vLSTM = Parametre['LSTM']
 ventrainement = Parametre['entrainement']
 
 FichierCsv = config['FichierCsv']
@@ -113,20 +117,6 @@ if MssqlActive1:
 if MssqlActive2:
     connPyodbc = pyodbc.connect(MssqlConnect2)
 
-#assert hasattr(tf, "function") # Be sure to use tensorflow 2.0
-
-column_names = ['CRMID',
-                'RangAll',
-                'RangCat1', 'RangCat2', 'RangCat3', 'RangCat4', 'RangCat5', 'RangCat6', 'RangCat7', 'RangCat8', 'RangCat9', 'RangCat10', 'RangCat11', 'RangCat12', 'RangCat13', 'RangCat14', 'RangCat15', 'RangCat16', 'RangCat17',
-                'canal1', 'canal2', 'canal12',
-                'fam_ac', 'fam_af', 'fam_ag', 'fam_an', 'fam_ar', 'fam_at', 'fam_cb', 'fam_ci', 'fam_cm', 'fam_cq', 'fam_cx', 'fam_hd', 'fam_hg', 'fam_hh', 'fam_hj', 'fam_hk', 'fam_hp', 'fam_hu', 'fam_hv', 'fam_kdo',
-                'line_is_valid',
-                'order_amount',
-                'has_fees',
-                'ofr_fid',
-                'ofr_rec',
-                'catalogog_is_sent',
-                'is_order']
 column_names_output = ['CRMID', 'RangAll', 'is_order', 'is_order_predict']
 # pour les fichiers csv
 dtypes = {'order_amount': float}
@@ -135,167 +125,7 @@ dtypes2 = {'order_amount': np.float64}
 train_input = []
 test_input = []
 
-#vbatch_size = 128
-#vstride = 34
-#vlength = 33
-
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut lecture des données')
-if csvActive:
-    fichiers = [fichier for fichier in os.listdir(InputTrain)]
-    for fichier in fichiers:
-        fichier_en_cours = fichier
-        df_fichier = pd.read_csv(os.path.join(InputTrain, fichier), header=None, names=column_names, sep=';', skiprows=1, encoding='ISO-8859-1', dtype=dtypes)
-        if len(df_fichier) != 0:
-            train_input.append(df_fichier)
-    df_train = pd.concat(train_input, axis=0, ignore_index=True)
-
-    fichiers = [fichier for fichier in os.listdir(InputTest)]
-    for fichier in fichiers:
-        fichier_en_cours = fichier
-        df_fichier = pd.read_csv(os.path.join(InputTest, fichier), header=None, names=column_names, sep=';', skiprows=1, encoding='ISO-8859-1', dtype=dtypes)
-        if len(df_fichier) != 0:
-            test_input.append(df_fichier)
-    nb_lignes_test = len(test_input)
-    df_test = pd.concat(test_input, axis=0, ignore_index=True)
-
-if MssqlActive12:
-    queryTrain = tabInputTrain1
-    command = SqlCommand(queryTrain, connConfig)
-    reader = command.ExecuteReader()
-    i = 0
-    j = 0
-    while reader.Read():
-        i = i + 1
-        j = j + 1
-        if i == 100000:
-            i = 0
-            print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'en cours lecture data train :', j)
-
-        col_crmid = reader["CRMID"]
-        col_RangAll = reader["RangAll"]
-        col_RangCat1 = reader["cat_1"]
-        col_RangCat2 = reader["cat_2"]
-        col_RangCat3 = reader["cat_3"]
-        col_RangCat4 = reader["cat_4"]
-        col_RangCat5 = reader["cat_5"]
-        col_RangCat6 = reader["cat_6"]
-        col_RangCat7 = reader["cat_7"]
-        col_RangCat8 = reader["cat_8"]
-        col_RangCat9 = reader["cat_9"]
-        col_RangCat10 = reader["cat_10"]
-        col_RangCat11 = reader["cat_11"]
-        col_RangCat12 = reader["cat_12"]
-        col_RangCat13 = reader["cat_13"]
-        col_RangCat14 = reader["cat_14"]
-        col_RangCat15 = reader["cat_15"]
-        col_RangCat16 = reader["cat_16"]
-        col_RangCat17 = reader["cat_17"]
-        col_canal1 = reader["can_1"]
-        col_canal2 = reader["can_2"]
-        col_canal12 = reader["can_12"]
-        col_fam_ac = reader["fam_ac"]
-        col_fam_af = reader["fam_af"]
-        col_fam_ag = reader["fam_ag"]
-        col_fam_an = reader["fam_an"]
-        col_fam_ar = reader["fam_ar"]
-        col_fam_at = reader["fam_at"]
-        col_fam_cb = reader["fam_cb"]
-        col_fam_ci = reader["fam_ci"]
-        col_fam_cm = reader["fam_cm"]
-        col_fam_cq = reader["fam_cq"]
-        col_fam_cx = reader["fam_cx"]
-        col_fam_hd = reader["fam_hd"]
-        col_fam_hg = reader["fam_hg"]
-        col_fam_hh = reader["fam_hh"]
-        col_fam_hj = reader["fam_hj"]
-        col_fam_hk = reader["fam_hk"]
-        col_fam_hp = reader["fam_hp"]
-        col_fam_hu = reader["fam_hu"]
-        col_fam_hv = reader["fam_hv"]
-        col_fam_kdo = reader["fam_kdo"]
-        col_line_is_valid = reader["line_is_valid"]
-        col_order_amount = reader["order_amount"]
-        col_has_fees = reader["has_fees"]
-        col_ofr_fid = reader["ofr_fid"]
-        col_ofr_rec = reader["ofr_rec"]
-        col_catalog_is_sent = reader["catalog_is_sent"]
-        col_is_order = reader["is_order"]
-        train_input.append((col_crmid, col_RangAll,
-                            col_RangCat1, col_RangCat2, col_RangCat3, col_RangCat4, col_RangCat5, col_RangCat6, col_RangCat7, col_RangCat8, col_RangCat9, col_RangCat10, col_RangCat11, col_RangCat12, col_RangCat13, col_RangCat14, col_RangCat15, col_RangCat16, col_RangCat17, 
-	                        col_canal1, col_canal2, col_canal12, 
-	                        col_fam_ac, col_fam_af, col_fam_ag, col_fam_an, col_fam_ar, col_fam_at, col_fam_cb, col_fam_ci, col_fam_cm, col_fam_cq, col_fam_cx, col_fam_hd, col_fam_hg, col_fam_hh, col_fam_hj, col_fam_hk, col_fam_hp, col_fam_hu, col_fam_hv, col_fam_kdo,
-	                        col_line_is_valid, col_order_amount, col_has_fees, col_ofr_fid, col_ofr_rec, col_catalog_is_sent, col_is_order))
-    reader.Close()
-    df_train = pd.DataFrame(train_input, columns=column_names).astype(dtypes2)
-
-    queryTest = tabInputTest1
-    command = SqlCommand(queryTest, connConfig)
-    reader = command.ExecuteReader()
-    i = 0
-    j = 0
-    while reader.Read():
-        i = i + 1
-        j = j + 1
-        if i == 100000:
-            i = 0
-            print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'en cours lecture data test :', j)
-
-        col_crmid = reader["CRMID"]
-        col_RangAll = reader["RangAll"]
-        col_RangCat1 = reader["cat_1"]
-        col_RangCat2 = reader["cat_2"]
-        col_RangCat3 = reader["cat_3"]
-        col_RangCat4 = reader["cat_4"]
-        col_RangCat5 = reader["cat_5"]
-        col_RangCat6 = reader["cat_6"]
-        col_RangCat7 = reader["cat_7"]
-        col_RangCat8 = reader["cat_8"]
-        col_RangCat9 = reader["cat_9"]
-        col_RangCat10 = reader["cat_10"]
-        col_RangCat11 = reader["cat_11"]
-        col_RangCat12 = reader["cat_12"]
-        col_RangCat13 = reader["cat_13"]
-        col_RangCat14 = reader["cat_14"]
-        col_RangCat15 = reader["cat_15"]
-        col_RangCat16 = reader["cat_16"]
-        col_RangCat17 = reader["cat_17"]
-        col_canal1 = reader["can_1"]
-        col_canal2 = reader["can_2"]
-        col_canal12 = reader["can_12"]
-        col_fam_ac = reader["fam_ac"]
-        col_fam_af = reader["fam_af"]
-        col_fam_ag = reader["fam_ag"]
-        col_fam_an = reader["fam_an"]
-        col_fam_ar = reader["fam_ar"]
-        col_fam_at = reader["fam_at"]
-        col_fam_cb = reader["fam_cb"]
-        col_fam_ci = reader["fam_ci"]
-        col_fam_cm = reader["fam_cm"]
-        col_fam_cq = reader["fam_cq"]
-        col_fam_cx = reader["fam_cx"]
-        col_fam_hd = reader["fam_hd"]
-        col_fam_hg = reader["fam_hg"]
-        col_fam_hh = reader["fam_hh"]
-        col_fam_hj = reader["fam_hj"]
-        col_fam_hk = reader["fam_hk"]
-        col_fam_hp = reader["fam_hp"]
-        col_fam_hu = reader["fam_hu"]
-        col_fam_hv = reader["fam_hv"]
-        col_fam_kdo = reader["fam_kdo"]
-        col_line_is_valid = reader["line_is_valid"]
-        col_order_amount = reader["order_amount"]
-        col_has_fees = reader["has_fees"]
-        col_ofr_fid = reader["ofr_fid"]
-        col_ofr_rec = reader["ofr_rec"]
-        col_catalog_is_sent = reader["catalog_is_sent"]
-        col_is_order = reader["is_order"]
-        test_input.append((col_crmid, col_RangAll,
-                            col_RangCat1, col_RangCat2, col_RangCat3, col_RangCat4, col_RangCat5, col_RangCat6, col_RangCat7, col_RangCat8, col_RangCat9, col_RangCat10, col_RangCat11, col_RangCat12, col_RangCat13, col_RangCat14, col_RangCat15, col_RangCat16, col_RangCat17, 
-	                        col_canal1, col_canal2, col_canal12, 
-	                        col_fam_ac, col_fam_af, col_fam_ag, col_fam_an, col_fam_ar, col_fam_at, col_fam_cb, col_fam_ci, col_fam_cm, col_fam_cq, col_fam_cx, col_fam_hd, col_fam_hg, col_fam_hh, col_fam_hj, col_fam_hk, col_fam_hp, col_fam_hu, col_fam_hv, col_fam_kdo,
-	                        col_line_is_valid, col_order_amount, col_has_fees, col_ofr_fid, col_ofr_rec, col_catalog_is_sent, col_is_order))
-    reader.Close()
-    df_test = pd.DataFrame(test_input, columns=column_names).astype(dtypes2)
 
 if MssqlActive2:
     if ventrainement:
@@ -303,34 +133,45 @@ if MssqlActive2:
         queryTrain = tabInputTrain2    
         cursor.execute(queryTrain)
         result_rows = cursor.fetchall()
-        column_names2 = [desc[0] for desc in cursor.description]
+        column_names = [desc[0] for desc in cursor.description]
         train_input = np.array(result_rows)
-        df_train = pd.DataFrame(train_input, columns=column_names2).astype(dtypes2)
+        df_train = pd.DataFrame(train_input, columns=column_names).astype(dtypes2)
         cursor.close()
-        
         del train_input
 
+        cursor = connPyodbc.cursor()
+        queryVal = tabInputVal2    
+        cursor.execute(queryVal)
+        result_rows = cursor.fetchall()
+        column_names = [desc[0] for desc in cursor.description]
+        val_input = np.array(result_rows)
+        df_val = pd.DataFrame(val_input, columns=column_names).astype(dtypes2)
+        cursor.close()
+        del val_input
+
     cursor = connPyodbc.cursor()
-    queryTest = tabInputTest2    
+    queryTest = tabInputTest2
     cursor.execute(queryTest)
     result_rows = cursor.fetchall()
     column_names2 = [desc[0] for desc in cursor.description]
     test_input = np.array(result_rows)
     df_test = pd.DataFrame(test_input, columns=column_names2).astype(dtypes2)
     cursor.close()
-
     del result_rows
     del test_input
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin lecture des données')
 
-#df_cat_train = pd.read_csv("C:/Users/TRINCKLIN/Documents/AFM/Python/github/apprentissage_catalogue/in/cat_train10.csv", header=None, names=column_names, sep=';', skiprows=1, dtype=dtypes)
-#df_cat_test = pd.read_csv("C:/Users/TRINCKLIN/Documents/AFM/Python/github/apprentissage_catalogue/in/cat_test10.csv", header=None, names=column_names, sep=';', skiprows=1, dtype=dtypes)
-#print(len(df_train))
-#print(df_train[:10])
+print('len df_train:',len(df_train))
+print('len df_val:',len(df_val))
+print('len df_test:',len(df_test))
+print('echantillon du jeu de test:', df_test[:10])
 
-print(len(df_test))
-print(df_test[:10])
+# 
+# contruction des dataset input et output
+# input : toutes les données sauf crmid et rangall
+# output : uniquement is_order
+#
 # j'enleve le crmid + rangAll mon dataset d'entrainement d'input
 if ventrainement:
     dataset_train_input = np.array(df_train)
@@ -341,6 +182,14 @@ if ventrainement:
     # je ne garde que le commande de mon dataset d'entrainement d'input
     dataset_train_output = dataset_train_input[:, -1:]
 
+    dataset_val_input = np.array(df_val)
+    # suppression du DF val
+    del df_val
+    dataset_val_input = dataset_val_input[:, 2:]
+    nb_lignes_train = len(dataset_val_input)
+    # je ne garde que le commande de mon dataset d'entrainement d'input
+    dataset_val_output = dataset_val_input[:, -1:]
+
 # j'enleve le crmid + rang All mon dataset de test d'input
 dataset_test_input = np.array(df_test)
 dataset_test_input = dataset_test_input[:, 2:]
@@ -348,67 +197,37 @@ nb_lignes_test = len(dataset_test_input)
 # je ne garde que le commande de mon dataset de test d'input
 dataset_test_output = dataset_test_input[:, -1:]
 
-#dataset_output = dataset_input[:-1, 2:]
-#dataset_output = dataset_input[1:, 2:]
-#derniere_ligne = np.array([[0, 0]])
-#dataset_output = np.append(dataset_output, derniere_ligne, axis = 0)
-#dataset_output = np.append(derniere_ligne, dataset_output, axis = 0)
-#dataset_test = dataset_train_input[:17, :]
-
-#print('len train_input', len(dataset_train_input))
-#print('shape train_input', dataset_train_input.shape)
-#print('train_input', dataset_train_input[:20, :])
-#print('train_input order_amount', dataset_train_input[:20, 41:42])
-
-#print(len(dataset_train_output))
-#print(dataset_train_output.shape)
-#print(dataset_train_output[:20])
-#print('test_input order_amount', dataset_test_input[:20, 41:42])
-
+#
+# normalisation de la donnée order_amount
+#
 if ventrainement:
     # normalisation du mntOrder du dataset d'entrainement
-    mean11 = dataset_train_input[:, 41:42].mean()
-    std11 = dataset_train_input[:, 41:42].std()
-    dataset_train_input[:, 41:42] = (dataset_train_input[:, 41:42] - mean11) / std11
+    mean11 = dataset_train_input[:, 21:22].mean()
+    std11 = dataset_train_input[:, 21:22].std()
+    dataset_train_input[:, 21:22] = (dataset_train_input[:, 21:22] - mean11) / std11
 
-    # normalisation su mntOrder du dataset de test
-    mean12 = dataset_test_input[:, 41:42].mean()
-    std12  = dataset_test_input[:, 41:42].std()
-    dataset_test_input[:, 41:42] = (dataset_test_input[:, 41:42] - mean11) / std11
+    # normalisation du mntOrder du dataset de validation à partir des valeurs des données d'entrainement
+    dataset_val_input[:, 21:22] = (dataset_val_input[:, 21:22] - mean11) / std11
 
-#print('mean2:', mean11)
-#print('std2:', std11)
-#print('mean2:', mean12)
-#print('std2:', std12)
-
-#print(vbatch_size)
-#print(vstride)
-#print(vlength)
-
-#print(nb_lignes_train)
-#print(nb_lignes_test)
-
-#print(len(dataset_train_input))
-#print(dataset_train_input.shape)
-#print(dataset_train_input[:20, :])
-
-#print(len(dataset_train_output))
-#print(dataset_train_output.shape)
-#print(dataset_train_output[:20])
-
-# pad_sequences
-# .....
+    # normalisation du mntOrder du dataset de test à partir des valeurs des données d'entrainement
+    dataset_test_input[:, 21:22] = (dataset_test_input[:, 21:22] - mean11) / std11
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut generation time series')
 
+#
+# generation des times series par batchs (lots) pour les data set train, val et test
+#
 if ventrainement:
     train_generator = TimeseriesGenerator(dataset_train_input, dataset_train_output, length=vlength, batch_size=vbatch_size, stride=vstride)
+    val_generator = TimeseriesGenerator(dataset_val_input, dataset_val_output, length=vlength, batch_size=vbatch_size, stride=vstride)
     # suppression des dataset train input/output
     del dataset_train_input
     del dataset_train_output
-test_generator = TimeseriesGenerator(dataset_test_input, dataset_test_output, length=vlength, batch_size=vbatch_size, stride=vstride)
+    del dataset_val_input
+    del dataset_val_output
 
-# suppression des dataset test input/output
+test_generator = TimeseriesGenerator(dataset_test_input, dataset_test_output, length=vlength, batch_size=vbatch_size, stride=vstride)
+# suppression des dataset val/test input/output
 del dataset_test_input
 del dataset_test_output
 
@@ -418,47 +237,58 @@ if ventrainement:
     print('batch x shape : ',x.shape)
     print('batch y shape : ',y.shape)
 
+# 13400951
+# for j in range(vlength):
+#     print('train_generator:', x[0][j][20], x[0][j][25], x[0][j][26], '-', y[0])
+# 12472501
+# print('------------------------------------')
+# for j in range(vlength):
+#     print('train_generator:', x[3][j][20], x[3][j][25], x[3][j][26], '-', y[3])
+    
 x,y=test_generator[0]
 print(f'Number of batch trains available : ', len(test_generator))
 print('batch x shape : ',x.shape)
 print('batch y shape : ',y.shape)
-#print('batch x shape : ',x)
-#print('batch y shape : ',y)
-
+#
+# définition du modele d'entrainement LSTM
+#
 if ventrainement:
     model = keras.models.Sequential()
     model.add( keras.layers.InputLayer(input_shape=(vlength, vparameter)))
-    model.add( keras.layers.LSTM(50, return_sequences=False, activation='relu'))
+    model.add( keras.layers.LSTM(vLSTM, return_sequences=False, activation='relu'))
     #model.add( keras.layers.Dense(200))
     #model.add( keras.layers.Dense(1, activation='sigmoid'))
     model.add( keras.layers.Dense(1))
     model.summary()
-
+#
+# paramètre du modele
+#
     model.compile(optimizer='rmsprop', loss='mse', metrics = ['mae'])
     #model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
     print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut entrainement du modele')
-
+#
+# entrainement du modele
+#
     #class_weight = {0: 0.95, 1: 0.05}
     #history=model.fit(train_generator, epochs = 5, validation_data = test_generator, class_weight=class_weight)
-    history=model.fit(train_generator, epochs = 5, validation_data = test_generator)
+    history=model.fit(train_generator, epochs = vepoch, validation_data = val_generator)
                   #verbose = 1,
                   #validation_data = test_generator,
                   #callbacks = [bestmodel_callback])
     
     del train_generator
+    del val_generator
 
     # Sauvegarder le modèle
-    model.save('model_catalogue.h5')
+    model.save('lstm_catalogue_v1.h5')
 
 if not ventrainement:
     # Charger le modèle
-    model = keras.models.load_model('model_catalogue.h5')
+    model = keras.models.load_model('lstm_catalogue_v1.h5')
 
-# dénormalisation du dataset d'input
 #
-#
-#
+# debut de la prediction du data set de test
 #
 # on récupère le crmid + rangall
 output_temp1 = np.array(df_test)[:, :2]
@@ -467,31 +297,14 @@ output_temp1 = np.array(df_test)[:, :2]
 # on récupère le commande
 output_temp2 = np.array(df_test)[:, -1:]
 #output_temp2 = output_temp2[:, -1:]
-
 del df_test
-
-print('------------------ output_temp1 --------------------')
-print(len(output_temp1))
-print(output_temp1.shape)
-#print(output_temp1[:20, :])
-print('------------------ output_temp2 --------------------')
-print(len(output_temp2))
-print(output_temp2.shape)
-#print(output_temp2[:20, :])
 
 # fusion des deux tableau --> crmid, rangall, cat_commande
 output_temp = np.concatenate((output_temp1, output_temp2), axis=1)
 del output_temp1
 del output_temp2
 
-print('------------------ output_temp --------------------')
-print(len(output_temp))
-print(output_temp.shape)
-#print(output_temp[:20, :])
-
 output = []
-#output[:, :1] = (output[:, :1] * std1) + mean1
-#output[:, 1:2] = (output[:, 1:2] * std2) + mean2
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut prediction')
 
@@ -500,20 +313,13 @@ for i in range(len(test_generator)):
     print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'prediction n°:', i)
     x,y=test_generator[i]
     prediction = model.predict(x)
-    #print(prediction.shape)
-    #print(x.shape)
-    #print(prediction)
     for j in range(len(x)):
-        #print('j:', j)
-        #print(x[j])
-        #print(prediction[j])
-        # on récupère le crm_id de la prédiction (cli_rang)
-        #cli_rang = np.array([output_temp[i*vbatch_size * vstride + j*vstride][0],vstride])
-        #print('is_order', i*vbatch_size * vstride + j*vstride + vstride - 1)
+        # on recup quelques données liées à la prediction (sequence suivante)
+        # recup crmid + rangall (=stride) + is_order réèl de la sequence suivante)
         cli_rang = np.array([output_temp[i*vbatch_size * vstride + j*vstride][0],vstride,output_temp[i*vbatch_size * vstride + j*vstride + vstride - 1][2]])
-        #print('cli_rang:', cli_rang)
+        # on concatène avec la prediction
         final_predict = np.append(cli_rang, prediction[j])
-        #print('final_predict:', final_predict)
+        # on ajoute chaque prédiction à la sortie
         if i == 0 and j == 0:
             output = final_predict
         else:
@@ -529,38 +335,15 @@ for i in range(len(test_generator)):
         #    output = np.vstack((output,(np.vstack((output_temp[a:b],final_predict)))))
 
 print('---------------------- output ----------------------')
-
-#print(len(output[:, -2:]))
-#print(output[:, -2:].shape)
-#print(len(output_temp))
-#print(output_temp.shape)
-print(output.shape)
-print(output)
-#print(output[:, -1:])
-
-# resultat final : on garde le reel (crmid, rangall, commande) et on ajoute pour le dernier rang la prediction et pour le reste le commande
-#result = np.hstack((output_temp, output[:, -1:]))
-#result_predict = result[result[:, 1] == vstride]
-
-"""
-print('---------------------- result ----------------------')
-print(len(result))
-print(result.shape)
-print(result)
-
-print('---------------------- result predict----------------------')
-print(len(result_predict))
-print(result_predict.shape)
-print(result_predict)
-"""
+print('shape output:', output.shape)
+# quelques echantillons de la sortie
+for i in range(10):
+    print('ouput:', i, output[i])
 
 df = pd.DataFrame(output, columns=column_names_output)
 print('output:', df)
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut ecriture des données')
-if csvActive:
-    df.to_csv(out, index=False, sep=';', header=True)
-
 if MssqlActive1:
     table_name = tabOutputTest1
 
@@ -581,23 +364,9 @@ if MssqlActive1:
     connConfig.Close()
     #df.to_sql(tabOutputTest, connConfig, if_exists="replace", index=False)
 
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin ecriture des données')
+
 if MssqlActive2:
     connPyodbc.close()
 
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin ecriture des données')
-
-#data_apredire = np.expand_dims(dataset_test, axis=0)
-#print(data_apredire.shape)
-#print(data_apredire)
-#prediction = model.predict(data_apredire)
-#print(prediction)
-
-#dataset_test[:, 2:4] = (dataset_test[:, 2:4] * std3) / mean3
-#print(dataset_test)
-
-#mean4 = prediction.mean()
-#std4  = prediction.std()
-#prediction = (prediction * std4) + mean4
-#print(prediction)
-
-#connConfig.Close()
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin traitement')

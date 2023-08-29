@@ -10,4 +10,7 @@ copySegFid.py
 req
 GE.py
 model_catalogue.h5
+resultat
+test*
+lstm*
 __pycache__
