@@ -90,6 +90,8 @@ vparameter = Parametre['parameter']
 vepoch = Parametre['epoch']
 vLSTM = Parametre['LSTM']
 ventrainement = Parametre['entrainement']
+vload_modele = Parametre['load_modele']
+vmodele = Parametre['modele']
 
 FichierCsv = config['FichierCsv']
 csvActive = FichierCsv['active']
@@ -124,11 +126,20 @@ dtypes = {'order_amount': float}
 dtypes2 = {'order_amount': np.float64}
 train_input = []
 test_input = []
+val_input = []
 
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut lecture des données')
+if vload_modele:
+    # Charger le modèle
+    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'chargement du modele')
+    #model = keras.models.load_model('lstm_catalogue_v1.h5')
+    model = keras.models.load_model(vmodele)
 
 if MssqlActive2:
     if ventrainement:
+        print('---------------------------------------------------------------')
+        print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut de la partie entrainement du modele')
+        print('---------------------------------------------------------------')
+        print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'lecture des données d''entrainement')
         cursor = connPyodbc.cursor()
         queryTrain = tabInputTrain2    
         cursor.execute(queryTrain)
@@ -148,27 +159,11 @@ if MssqlActive2:
         df_val = pd.DataFrame(val_input, columns=column_names).astype(dtypes2)
         cursor.close()
         del val_input
-
-    cursor = connPyodbc.cursor()
-    queryTest = tabInputTest2
-    cursor.execute(queryTest)
-    result_rows = cursor.fetchall()
-    column_names2 = [desc[0] for desc in cursor.description]
-    test_input = np.array(result_rows)
-    df_test = pd.DataFrame(test_input, columns=column_names2).astype(dtypes2)
-    cursor.close()
-    del result_rows
-    del test_input
-
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin lecture des données')
-
-print('len df_train:',len(df_train))
-print('len df_val:',len(df_val))
-print('len df_test:',len(df_test))
-print('echantillon du jeu de test:', df_test[:10])
-
+        print('len df_train:',len(df_train))
+        print('len df_val:',len(df_val))
+        print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin lecture des données d''entrainement')
 # 
-# contruction des dataset input et output
+# contruction des dataset input et output des données train et val
 # input : toutes les données sauf crmid et rangall
 # output : uniquement is_order
 #
@@ -189,14 +184,6 @@ if ventrainement:
     nb_lignes_train = len(dataset_val_input)
     # je ne garde que le commande de mon dataset d'entrainement d'input
     dataset_val_output = dataset_val_input[:, -1:]
-
-# j'enleve le crmid + rang All mon dataset de test d'input
-dataset_test_input = np.array(df_test)
-dataset_test_input = dataset_test_input[:, 2:]
-nb_lignes_test = len(dataset_test_input)
-# je ne garde que le commande de mon dataset de test d'input
-dataset_test_output = dataset_test_input[:, -1:]
-
 #
 # normalisation de la donnée order_amount
 #
@@ -209,13 +196,9 @@ if ventrainement:
     # normalisation du mntOrder du dataset de validation à partir des valeurs des données d'entrainement
     dataset_val_input[:, 21:22] = (dataset_val_input[:, 21:22] - mean11) / std11
 
-    # normalisation du mntOrder du dataset de test à partir des valeurs des données d'entrainement
-    dataset_test_input[:, 21:22] = (dataset_test_input[:, 21:22] - mean11) / std11
-
-print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut generation time series')
-
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut generation time series d''entrainement')
 #
-# generation des times series par batchs (lots) pour les data set train, val et test
+# generation des times series par batchs (lots) pour les data set train, val
 #
 if ventrainement:
     train_generator = TimeseriesGenerator(dataset_train_input, dataset_train_output, length=vlength, batch_size=vbatch_size, stride=vstride)
@@ -226,12 +209,6 @@ if ventrainement:
     del dataset_val_input
     del dataset_val_output
 
-test_generator = TimeseriesGenerator(dataset_test_input, dataset_test_output, length=vlength, batch_size=vbatch_size, stride=vstride)
-# suppression des dataset val/test input/output
-del dataset_test_input
-del dataset_test_output
-
-if ventrainement:
     x,y=train_generator[0]
     print(f'Number of batch trains available : ', len(train_generator))
     print('batch x shape : ',x.shape)
@@ -245,26 +222,23 @@ if ventrainement:
 # for j in range(vlength):
 #     print('train_generator:', x[3][j][20], x[3][j][25], x[3][j][26], '-', y[3])
     
-x,y=test_generator[0]
-print(f'Number of batch trains available : ', len(test_generator))
-print('batch x shape : ',x.shape)
-print('batch y shape : ',y.shape)
 #
 # définition du modele d'entrainement LSTM
 #
 if ventrainement:
-    model = keras.models.Sequential()
-    model.add( keras.layers.InputLayer(input_shape=(vlength, vparameter)))
-    model.add( keras.layers.LSTM(vLSTM, return_sequences=False, activation='relu'))
-    #model.add( keras.layers.Dense(200))
-    #model.add( keras.layers.Dense(1, activation='sigmoid'))
-    model.add( keras.layers.Dense(1))
-    model.summary()
-#
-# paramètre du modele
-#
-    model.compile(optimizer='rmsprop', loss='mse', metrics = ['mae'])
-    #model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    if not vload_modele:
+        model = keras.models.Sequential()
+        model.add( keras.layers.InputLayer(input_shape=(vlength, vparameter)))
+        model.add( keras.layers.LSTM(vLSTM, return_sequences=False, activation='relu'))
+        #model.add( keras.layers.Dense(200))
+        #model.add( keras.layers.Dense(1, activation='sigmoid'))
+        model.add( keras.layers.Dense(1))
+        model.summary()
+        #
+        # paramètre du modele
+        #
+        model.compile(optimizer='rmsprop', loss='mse', metrics = ['mae'])
+        #model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
     print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut entrainement du modele')
 #
@@ -281,15 +255,68 @@ if ventrainement:
     del val_generator
 
     # Sauvegarder le modèle
-    model.save('lstm_catalogue_v1.h5')
+    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'sauvagarde du modele')
+    model.save(vmodele)
+#
+# traitement de la data de test (pour la prediction)
+#
+print('---------------------------------------------------------------')
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut de la partie de traitement des données de test (prediction)')
+print('---------------------------------------------------------------')
 
-if not ventrainement:
-    # Charger le modèle
-    model = keras.models.load_model('lstm_catalogue_v1.h5')
+if MssqlActive2:
+    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'lecture des données de test')
+    cursor = connPyodbc.cursor()
+    queryTest = tabInputTest2
+    cursor.execute(queryTest)
+    result_rows = cursor.fetchall()
+    column_names2 = [desc[0] for desc in cursor.description]
+    test_input = np.array(result_rows)
+    df_test = pd.DataFrame(test_input, columns=column_names2).astype(dtypes2)
+    cursor.close()
+    del result_rows
+    del test_input
+    print('len df_test:',len(df_test))
+    print('echantillon du jeu de test:', df_test[:10])
+    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'fin lecture des données de test')
+# 
+# contruction des dataset input et output des données test
+# input : toutes les données sauf crmid et rangall
+# output : uniquement is_order
+#
+# j'enleve le crmid + rang All mon dataset de test d'input
+dataset_test_input = np.array(df_test)
+dataset_test_input = dataset_test_input[:, 2:]
+nb_lignes_test = len(dataset_test_input)
+# je ne garde que le commande de mon dataset de test d'input
+dataset_test_output = dataset_test_input[:, -1:]
 
+if ventrainement:
+    # normalisation du mntOrder du dataset de test à partir des valeurs des données d'entrainement
+    dataset_test_input[:, 21:22] = (dataset_test_input[:, 21:22] - mean11) / std11
+else:
+    # normalisation du mntOrder du dataset de test
+    mean11 = dataset_test_input[:, 21:22].mean()
+    std11 = dataset_test_input[:, 21:22].std()
+    dataset_test_input[:, 21:22] = (dataset_test_input[:, 21:22] - mean11) / std11
+#
+# generation des times series par batchs (lots) pour les data set test (prediction)
+#
+test_generator = TimeseriesGenerator(dataset_test_input, dataset_test_output, length=vlength, batch_size=vbatch_size, stride=vstride)
+# suppression des dataset val/test input/output
+del dataset_test_input
+del dataset_test_output
+
+x,y=test_generator[0]
+print(f'Number of batch tests available : ', len(test_generator))
+print('batch x shape : ',x.shape)
+print('batch y shape : ',y.shape)
 #
 # debut de la prediction du data set de test
 #
+print('---------------------------------------------------------------')
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut de la partie de traitement des predictions')
+print('---------------------------------------------------------------')
 # on récupère le crmid + rangall
 output_temp1 = np.array(df_test)[:, :2]
 #output_temp1 = output_temp1[:, :2]
@@ -307,8 +334,7 @@ del output_temp2
 output = []
 
 print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut prediction')
-
-print(len(test_generator))
+print('len du test generator', len(test_generator))
 for i in range(len(test_generator)):
     print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'prediction n°:', i)
     x,y=test_generator[i]
@@ -334,7 +360,9 @@ for i in range(len(test_generator)):
         #else:
         #    output = np.vstack((output,(np.vstack((output_temp[a:b],final_predict)))))
 
-print('---------------------- output ----------------------')
+print('---------------------------------------------------------------')
+print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")[:-3], 'debut de la partie output')
+print('---------------------------------------------------------------')
 print('shape output:', output.shape)
 # quelques echantillons de la sortie
 for i in range(10):
